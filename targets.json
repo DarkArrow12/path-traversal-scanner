@@ -1,0 +1,12 @@
+[
+  {"id": "linux-passwd",   "os": "linux",   "path": "/etc/passwd",            "signature": "root:[x*]:0:0:",                              "note": "User enumeration; canonical Linux PoC"},
+  {"id": "linux-shadow",   "os": "linux",   "path": "/etc/shadow",            "signature": "root:\\$[156yba]\\$",                          "note": "Password hashes; proves high-priv read"},
+  {"id": "linux-hosts",    "os": "linux",   "path": "/etc/hosts",             "signature": "127\\.0\\.0\\.1\\s+localhost",                 "note": "Internal network topology"},
+  {"id": "linux-hostname", "os": "linux",   "path": "/etc/hostname",          "signature": "^[a-zA-Z0-9][a-zA-Z0-9\\-]{0,62}\\s*$",        "note": "Single-line host identity"},
+  {"id": "linux-environ",  "os": "linux",   "path": "/proc/self/environ",     "signature": "(HOME=|PATH=|PWD=)",                           "note": "Process env; may leak secrets. Null-delimited"},
+  {"id": "linux-version",  "os": "linux",   "path": "/proc/version",          "signature": "Linux version \\d+\\.\\d+",                     "note": "Kernel version"},
+  {"id": "linux-sshkey",   "os": "linux",   "path": "/root/.ssh/id_rsa",      "signature": "-----BEGIN (RSA|OPENSSH) PRIVATE KEY-----",    "note": "SSH private key -> shell"},
+  {"id": "win-ini",        "os": "windows", "path": "/windows/win.ini",       "signature": "\\[fonts\\]",                                  "note": "Canonical Windows PoC; always present"},
+  {"id": "win-hosts",      "os": "windows", "path": "/windows/system32/drivers/etc/hosts", "signature": "127\\.0\\.0\\.1\\s+localhost",   "note": "Windows hosts file"},
+  {"id": "win-webconfig",  "os": "windows", "path": "/inetpub/wwwroot/web.config", "signature": "<configuration>",                        "note": "IIS config; may leak conn strings"}
+]

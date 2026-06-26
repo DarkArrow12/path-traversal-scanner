@@ -1,0 +1,29 @@
+# Loot / exfiltrated content — NEVER commit
+loot/
+
+# Internal framework planning docs — keep private, not for the public repo
+SPEC.md
+PLAN.md
+
+# Python caches
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Anything that could hold credentials/tokens
+*.cookie
+*.session
+.env
+secrets*
