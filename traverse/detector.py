@@ -50,7 +50,7 @@ def classify(text: str, status: int, signature: str,
         start = max(0, text.find(nonce) - 40)
         return {"hit": True, "confidence": "HIGH", "snippet": text[start:start + 240]}
     # HIGH: the file's signature is present.
-    if matches_signature(text, signature):
+    if signature and matches_signature(text, signature):
         return {"hit": True, "confidence": "HIGH", "snippet": _snippet(text, signature)}
     # HIGH: a base64 blob decodes to PHP source (php://filter disclosure).
     ok, decoded = looks_like_php_source(text)

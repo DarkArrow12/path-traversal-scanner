@@ -20,3 +20,9 @@ def test_parser_accepts_body_flags():
 def test_parser_json_body_dest():
     args = build_parser().parse_args(["-u", "http://h/api", "--json", '{"p":"FUZZ"}'])
     assert args.json_body == '{"p":"FUZZ"}'
+
+
+def test_parser_wrapper_flags():
+    args = build_parser().parse_args(
+        ["-u", "http://h/fi?page=FUZZ", "--wrapper", "filter", "--resource", "index.php"])
+    assert args.wrapper == "filter" and args.resource == "index.php"

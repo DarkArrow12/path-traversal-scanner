@@ -7,7 +7,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .scanner import scan, load_targets
+from .scanner import scan, load_targets, run_wrapper
 from .transport import build_session  # noqa: F401 (re-export)
 from . import report
 
@@ -28,6 +28,10 @@ def build_parser():
     p.add_argument("--method", help="HTTP method (default: GET, or POST when --data/--json given)")
     p.add_argument("--target-file", help="Specific file to read (default: built-in library)")
     p.add_argument("--signature", help="Detection regex for --target-file (default: /etc/passwd marker)")
+    p.add_argument("--wrapper", choices=["filter", "data", "expect", "input"],
+                   help="File-inclusion wrapper mode (needs --resource or --cmd)")
+    p.add_argument("--resource", help="File to read via --wrapper filter, e.g. index.php")
+    p.add_argument("--cmd", help="Command to run via --wrapper data/expect/input, e.g. id")
     p.add_argument("--os", choices=["linux", "windows", "both"], default="both")
     p.add_argument("--categories", help="Comma-separated target categories: poc,secrets,config,cloud,source")
     p.add_argument("--depth", type=int, default=8)
@@ -68,19 +72,28 @@ def main(argv=None):
     url = args.url if body_mode else _normalize_url(args.url, args.param)
     session = build_session(args.cookie, args.header)
 
-    categories = [c.strip() for c in args.categories.split(",")] if args.categories else None
-    targets = load_targets(os_filter=args.os, categories=categories)
-    if args.target_file:
-        sig = args.signature or "root:[x*]:0:0:"
-        targets = [{"path": args.target_file, "os": args.os, "category": "user",
-                    "signature": sig, "note": "user-specified"}]
-    null_exts = [e.strip() for e in args.null_exts.split(",")] if args.null_exts else None
+    if args.wrapper:
+        if args.wrapper == "filter" and not args.resource:
+            raise SystemExit("[!] --wrapper filter requires --resource")
+        if args.wrapper in ("data", "expect", "input") and not args.cmd:
+            raise SystemExit(f"[!] --wrapper {args.wrapper} requires --cmd")
+        hits = run_wrapper(session, url, args.wrapper, resource=args.resource,
+                           cmd=args.cmd, method=args.method,
+                           data_template=args.data, json_template=args.json_body)
+    else:
+        categories = [c.strip() for c in args.categories.split(",")] if args.categories else None
+        targets = load_targets(os_filter=args.os, categories=categories)
+        if args.target_file:
+            sig = args.signature or "root:[x*]:0:0:"
+            targets = [{"path": args.target_file, "os": args.os, "category": "user",
+                        "signature": sig, "note": "user-specified"}]
+        null_exts = [e.strip() for e in args.null_exts.split(",")] if args.null_exts else None
 
-    hits = scan(session, url, depth=args.depth, delay=args.delay,
-                stop_on_first=not args.all, os_filter=args.os, targets=targets,
-                method=args.method, data_template=args.data,
-                json_template=args.json_body, null_exts=null_exts,
-                threads=args.threads)
+        hits = scan(session, url, depth=args.depth, delay=args.delay,
+                    stop_on_first=not args.all, os_filter=args.os, targets=targets,
+                    method=args.method, data_template=args.data,
+                    json_template=args.json_body, null_exts=null_exts,
+                    threads=args.threads)
 
     for h in hits:
         report.save_loot(args.loot_dir, h["target"], h["snippet"])

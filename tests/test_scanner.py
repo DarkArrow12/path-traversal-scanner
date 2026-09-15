@@ -60,3 +60,40 @@ def test_scan_requires_fuzz_marker():
     from traverse.scanner import scan
     with pytest.raises(ValueError):
         scan(_FakeSession(), "http://h/no-marker", targets=[_PASSWD])
+
+
+class _EchoSession:
+    """Simulates a server that reflects the request so canaries/base64 surface."""
+    def __init__(self, mode):
+        self.mode = mode
+
+    def request(self, method, url, data=None, headers=None, timeout=15):
+        import base64
+        import re
+        if self.mode == "filter":
+            return _Resp(base64.b64encode(b"<?php $secret=1;?>").decode())
+        if self.mode == "input":  # server executes body PHP -> echoes the nonce
+            m = re.search(r"echo '([^']+)'", data or "")
+            return _Resp(m.group(1) if m else "no exec")
+        return _Resp("nope", 200)
+
+
+def test_run_wrapper_filter_reads_source():
+    from traverse.scanner import run_wrapper
+    hits = run_wrapper(_EchoSession("filter"), "http://h/fi?page=FUZZ",
+                       "filter", resource="config.php")
+    assert hits and hits[0]["confidence"] == "HIGH" and "secret" in hits[0]["snippet"]
+
+
+def test_run_wrapper_input_rce_canary():
+    from traverse.scanner import run_wrapper
+    hits = run_wrapper(_EchoSession("input"), "http://h/fi?page=FUZZ",
+                       "input", cmd="id")
+    assert hits and hits[0]["confidence"] == "HIGH"
+
+
+def test_run_wrapper_requires_fuzz():
+    import pytest
+    from traverse.scanner import run_wrapper
+    with pytest.raises(ValueError):
+        run_wrapper(_EchoSession("filter"), "http://h/fi", "filter", resource="x")

