@@ -50,5 +50,10 @@ def build_session(cookie=None, headers=None) -> requests.Session:
 
 
 def send(session, method: str, url: str, *, data=None, json_body=None, timeout: int = 15):
-    """Dispatch a request. `data` is a raw body/dict; `json_body` is JSON."""
-    return session.request(method, url, data=data, json=json_body, timeout=timeout)
+    """Dispatch a request. `data` is a raw body; `json_body` is a pre-serialized
+    JSON string sent verbatim with an application/json content type."""
+    if json_body is not None:
+        return session.request(method, url, data=json_body,
+                               headers={"Content-Type": "application/json"},
+                               timeout=timeout)
+    return session.request(method, url, data=data, timeout=timeout)
