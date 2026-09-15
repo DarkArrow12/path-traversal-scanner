@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from .scanner import scan, load_targets, run_wrapper, run_log_poison
+from .filterchain import run_filter_chain
 from .transport import build_session  # noqa: F401 (re-export)
 from . import report
 
@@ -33,6 +34,8 @@ def build_parser():
     p.add_argument("--resource", help="File to read via --wrapper filter, e.g. index.php")
     p.add_argument("--cmd", help="Command to run via --wrapper data/expect/input, e.g. id")
     p.add_argument("--poison-log", help="LFI-to-RCE via log poisoning: log path to poison+include (needs --cmd)")
+    p.add_argument("--filter-chain", action="store_true", help="LFI-to-RCE via PHP filter chains (needs --cmd and --filter-chain-gen)")
+    p.add_argument("--filter-chain-gen", help="Path to a local php_filter_chain_generator.py (upstream Synacktiv tool)")
     p.add_argument("--os", choices=["linux", "windows", "both"], default="both")
     p.add_argument("--categories", help="Comma-separated target categories: poc,secrets,config,cloud,source")
     p.add_argument("--depth", type=int, default=8)
@@ -73,7 +76,16 @@ def main(argv=None):
     url = args.url if body_mode else _normalize_url(args.url, args.param)
     session = build_session(args.cookie, args.header)
 
-    if args.poison_log:
+    if args.filter_chain:
+        if not args.cmd:
+            raise SystemExit("[!] --filter-chain requires --cmd")
+        if not args.filter_chain_gen:
+            raise SystemExit("[!] --filter-chain requires --filter-chain-gen "
+                             "(path to php_filter_chain_generator.py)")
+        hits = run_filter_chain(session, url, args.cmd,
+                                generator_path=args.filter_chain_gen,
+                                method=args.method)
+    elif args.poison_log:
         if not args.cmd:
             raise SystemExit("[!] --poison-log requires --cmd")
         hits = run_log_poison(session, url, args.poison_log, args.cmd,

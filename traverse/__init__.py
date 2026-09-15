@@ -6,14 +6,16 @@ __version__ = "0.2.0"
 
 from .payloads import generate_payloads
 from .detector import classify, matches_signature, looks_like_php_source, contains_canary
-from .scanner import scan, run_wrapper, load_targets, inject
+from .scanner import scan, run_wrapper, run_log_poison, load_targets, inject
 from .wrappers import php_filter_read, data_wrapper, expect_wrapper, php_input_body
+from .filterchain import run_filter_chain
 from .cli import main, build_parser, build_session
 
 __all__ = [
     "generate_payloads", "classify", "matches_signature",
     "looks_like_php_source", "contains_canary",
-    "scan", "run_wrapper", "load_targets", "inject",
+    "scan", "run_wrapper", "run_log_poison", "run_filter_chain",
+    "load_targets", "inject",
     "php_filter_read", "data_wrapper", "expect_wrapper", "php_input_body",
     "main", "build_parser", "build_session", "__version__",
 ]

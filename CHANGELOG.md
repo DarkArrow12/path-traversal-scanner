@@ -21,6 +21,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   `--method`.
 - File-inclusion wrappers: `php://filter` (source disclosure, auto base64
   decode), `data://`, `expect://`, `php://input` (RCE via echoed canary).
+- LFI-to-RCE: log poisoning (`--poison-log`) and PHP filter chains
+  (`--filter-chain`, driving the upstream Synacktiv generator).
 - JSON output (`--output json` / `--outfile`) and optional concurrency
   (`--threads`, default 1).
 
