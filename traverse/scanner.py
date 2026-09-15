@@ -4,14 +4,7 @@ import time
 from .payloads import generate_payloads
 from .detector import classify
 from .targets import load as load_targets, DEFAULT_TARGETS  # noqa: F401 (re-export)
-
-FUZZ = "FUZZ"
-
-
-def inject(url_template: str, payload: str) -> str:
-    """Replace the FUZZ marker. Payload is inserted verbatim so deliberate
-    percent-encoding (e.g. %252e) is preserved rather than double-quoted."""
-    return url_template.replace(FUZZ, payload)
+from .transport import inject, FUZZ  # noqa: F401 (re-export)
 
 
 def _baseline(session, url_template):

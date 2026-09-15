@@ -7,9 +7,8 @@ import argparse
 import sys
 from pathlib import Path
 
-import requests
-
 from .scanner import scan, load_targets
+from .transport import build_session  # noqa: F401 (re-export)
 
 BANNER = "traverse — path traversal & file inclusion toolkit | AUTHORIZED TARGETS ONLY"
 
@@ -34,17 +33,6 @@ def build_parser():
     return p
 
 
-def build_session(cookie, headers):
-    s = requests.Session()
-    s.headers.update({"User-Agent": "traverse.py (authorized testing)"})
-    if cookie and "=" in cookie:
-        name, _, value = cookie.partition("=")
-        s.cookies.set(name.strip(), value.strip())
-    for h in headers or []:
-        if ":" in h:
-            name, _, value = h.partition(":")
-            s.headers[name.strip()] = value.strip()
-    return s
 
 
 def _normalize_url(url, param):
