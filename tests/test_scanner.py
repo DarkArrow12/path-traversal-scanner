@@ -97,3 +97,34 @@ def test_run_wrapper_requires_fuzz():
     from traverse.scanner import run_wrapper
     with pytest.raises(ValueError):
         run_wrapper(_EchoSession("filter"), "http://h/fi", "filter", resource="x")
+
+
+class _LogSession:
+    """Simulates access-log poisoning: stores a planted UA, then 'executes' it
+    when the log file is included."""
+    def __init__(self):
+        self.log = ""
+
+    def request(self, method, url, data=None, headers=None, timeout=15):
+        import re
+        if headers and "User-Agent" in headers:
+            self.log = headers["User-Agent"]
+            return _Resp("ok", 200)
+        if "access.log" in url:
+            m = re.search(r"echo '([^']+)'", self.log)
+            return _Resp(m.group(1) if m else self.log, 200)
+        return _Resp("not found", 404)
+
+
+def test_run_log_poison_rce():
+    from traverse.scanner import run_log_poison
+    hits = run_log_poison(_LogSession(), "http://h/fi?page=FUZZ",
+                          "/var/log/apache2/access.log", "id", delay=0)
+    assert hits and hits[0]["confidence"] == "HIGH"
+
+
+def test_run_log_poison_requires_fuzz():
+    import pytest
+    from traverse.scanner import run_log_poison
+    with pytest.raises(ValueError):
+        run_log_poison(_LogSession(), "http://h/fi", "/var/log/x", "id")

