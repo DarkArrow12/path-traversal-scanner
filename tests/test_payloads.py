@@ -32,3 +32,20 @@ def test_results_are_deduplicated():
 def test_os_filter_windows_uses_backslash():
     p = generate_payloads("/windows/win.ini", os_filter="windows")
     assert any("\\" in s for s in p)
+
+
+def test_double_encoded_null_byte_with_md_extension():
+    # Juice Shop poison null byte: %2500 (the % is itself encoded) + .md
+    p = generate_payloads("/ftp/package.json.bak", depth=1, null_exts=[".md"])
+    assert any("%2500.md" in x for x in p)
+
+
+def test_null_byte_no_traversal_variant_for_path_segment():
+    # /ftp/FUZZ style: target-file only, no ../ needed
+    p = generate_payloads("package.json.bak", depth=1, null_exts=[".md"])
+    assert "package.json.bak%2500.md" in p
+
+
+def test_single_null_byte_still_present():
+    p = generate_payloads("/etc/passwd", depth=1)
+    assert any("%00.png" in x for x in p)

