@@ -1,4 +1,4 @@
-from discover import find_params
+from traverse.discover import find_params
 
 
 def test_find_params_prefers_file_like_names():

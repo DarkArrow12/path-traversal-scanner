@@ -1,4 +1,4 @@
-from payloads import generate_payloads
+from traverse.payloads import generate_payloads
 
 def test_includes_basic_traversal():
     p = generate_payloads("/etc/passwd", depth=4)

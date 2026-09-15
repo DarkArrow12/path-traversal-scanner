@@ -1,7 +1,7 @@
 import json, re
 from pathlib import Path
 
-TARGETS = Path(__file__).resolve().parent.parent / "targets.json"
+TARGETS = Path(__file__).resolve().parent.parent / "traverse" / "data" / "targets.json"
 
 def test_targets_load_and_have_required_fields():
     data = json.loads(TARGETS.read_text(encoding="utf-8"))

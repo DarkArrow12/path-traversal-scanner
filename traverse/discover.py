@@ -3,7 +3,7 @@ import re
 
 import requests
 
-from scanner import scan, load_targets
+from .scanner import scan, load_targets
 
 FILEISH = ["file", "path", "page", "doc", "img", "image", "template", "lang", "download"]
 
@@ -19,7 +19,7 @@ def find_params(html: str, base_url: str) -> list:
 
 
 def auto_discover(args) -> int:
-    from traverse import build_session  # local import avoids circular import
+    from .cli import build_session  # local import avoids circular import
     session = build_session(args.cookie, args.header)
     print(f"[*] Fetching {args.auto} to discover parameters...")
     resp = session.get(args.auto, timeout=15)
@@ -28,7 +28,7 @@ def auto_discover(args) -> int:
         print("[-] No candidate parameters found.")
         return 1
     print(f"[*] Candidate params: {', '.join(params)}")
-    targets = load_targets("targets.json", args.os)
+    targets = load_targets(os_filter=args.os)
     for param in params:
         sep = "&" if "?" in args.auto else "?"
         template = f"{args.auto.split('?')[0]}{sep}{param}=FUZZ"

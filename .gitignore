@@ -2,8 +2,8 @@
 loot/
 
 # Internal framework planning docs — keep private, not for the public repo
-SPEC.md
-PLAN.md
+SPEC*.md
+PLAN*.md
 
 # Python caches
 __pycache__/

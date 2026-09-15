@@ -3,10 +3,11 @@ import json
 import time
 from pathlib import Path
 
-from payloads import generate_payloads
-from detector import classify
+from .payloads import generate_payloads
+from .detector import classify
 
 FUZZ = "FUZZ"
+DEFAULT_TARGETS = Path(__file__).resolve().parent / "data" / "targets.json"
 
 
 def inject(url_template: str, payload: str) -> str:
@@ -15,7 +16,9 @@ def inject(url_template: str, payload: str) -> str:
     return url_template.replace(FUZZ, payload)
 
 
-def load_targets(path: str, os_filter: str = "both") -> list:
+def load_targets(path=None, os_filter: str = "both") -> list:
+    if path is None:
+        path = DEFAULT_TARGETS
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     if os_filter == "both":
         return data
@@ -33,7 +36,7 @@ def scan(session, url_template, depth=8, delay=0.3, stop_on_first=True,
          os_filter="both", targets=None):
     if FUZZ not in url_template:
         raise ValueError("URL must contain the FUZZ marker (e.g. ?filename=FUZZ)")
-    targets = targets if targets is not None else load_targets("targets.json", os_filter)
+    targets = targets if targets is not None else load_targets(os_filter=os_filter)
     base_len, base_status = _baseline(session, url_template)
     hits = []
     for target in targets:

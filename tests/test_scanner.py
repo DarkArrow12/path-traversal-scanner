@@ -1,4 +1,4 @@
-from scanner import inject, load_targets
+from traverse.scanner import inject, load_targets
 
 
 def test_inject_replaces_fuzz():
@@ -12,5 +12,5 @@ def test_inject_preserves_percent_payloads():
 
 
 def test_load_targets_os_filter():
-    linux = load_targets("targets.json", os_filter="linux")
+    linux = load_targets(os_filter="linux")
     assert linux and all(t["os"] == "linux" for t in linux)

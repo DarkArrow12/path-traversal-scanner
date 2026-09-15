@@ -9,7 +9,7 @@ from pathlib import Path
 
 import requests
 
-from scanner import scan, load_targets
+from .scanner import scan, load_targets
 
 BANNER = "traverse.py — path traversal scanner | AUTHORIZED TARGETS ONLY"
 
@@ -67,11 +67,11 @@ def main(argv=None):
     args = build_parser().parse_args(argv)
     print(BANNER)
     if args.auto:
-        from discover import auto_discover
+        from .discover import auto_discover
         return auto_discover(args)
     url = _normalize_url(args.url, args.param)
     session = build_session(args.cookie, args.header)
-    targets = load_targets("targets.json", args.os)
+    targets = load_targets(os_filter=args.os)
     if args.target_file:
         targets = [{"path": args.target_file, "os": args.os, "signature": "root:[x*]:0:0:", "note": "user-specified"}]
     hits = scan(session, url, depth=args.depth, delay=args.delay,

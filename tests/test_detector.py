@@ -1,4 +1,4 @@
-from detector import matches_signature, classify
+from traverse.detector import matches_signature, classify
 
 PASSWD = "root:x:0:0:root:/root:/bin/bash\ndaemon:x:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n"
 

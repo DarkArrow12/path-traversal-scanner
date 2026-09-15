@@ -1,4 +1,4 @@
-from traverse import build_parser, build_session
+from traverse.cli import build_parser, build_session
 
 def test_parser_requires_a_mode():
     parser = build_parser()
