@@ -1,28 +1,17 @@
 """Network layer: inject payloads, send via a Session, classify responses."""
-import json
 import time
-from pathlib import Path
 
 from .payloads import generate_payloads
 from .detector import classify
+from .targets import load as load_targets, DEFAULT_TARGETS  # noqa: F401 (re-export)
 
 FUZZ = "FUZZ"
-DEFAULT_TARGETS = Path(__file__).resolve().parent / "data" / "targets.json"
 
 
 def inject(url_template: str, payload: str) -> str:
     """Replace the FUZZ marker. Payload is inserted verbatim so deliberate
     percent-encoding (e.g. %252e) is preserved rather than double-quoted."""
     return url_template.replace(FUZZ, payload)
-
-
-def load_targets(path=None, os_filter: str = "both") -> list:
-    if path is None:
-        path = DEFAULT_TARGETS
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
-    if os_filter == "both":
-        return data
-    return [t for t in data if t["os"] == os_filter]
 
 
 def _baseline(session, url_template):
