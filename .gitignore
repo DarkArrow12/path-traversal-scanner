@@ -27,3 +27,7 @@ Thumbs.db
 *.session
 .env
 secrets*
+
+# Build artifacts
+build/
+dist/
