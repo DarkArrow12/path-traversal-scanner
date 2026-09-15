@@ -11,7 +11,7 @@ import requests
 
 from .scanner import scan, load_targets
 
-BANNER = "traverse.py — path traversal scanner | AUTHORIZED TARGETS ONLY"
+BANNER = "traverse — path traversal & file inclusion toolkit | AUTHORIZED TARGETS ONLY"
 
 
 def build_parser():
