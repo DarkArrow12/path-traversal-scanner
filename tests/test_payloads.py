@@ -49,3 +49,13 @@ def test_null_byte_no_traversal_variant_for_path_segment():
 def test_single_null_byte_still_present():
     p = generate_payloads("/etc/passwd", depth=1)
     assert any("%00.png" in x for x in p)
+
+
+def test_includes_16bit_unicode():
+    p = generate_payloads("/etc/passwd", depth=1)
+    assert any("%u002e%u002e%u2215" in x for x in p)   # ../
+
+
+def test_includes_utf8_overlong():
+    p = generate_payloads("/etc/passwd", depth=1)
+    assert any("%c0%ae%c0%ae%c0%af" in x for x in p)    # ../
