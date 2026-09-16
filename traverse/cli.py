@@ -47,8 +47,7 @@ def build_parser():
     p.add_argument("--all", action="store_true", help="Don't stop at first HIGH hit")
     p.add_argument("--output", choices=["console", "json"], default="console")
     p.add_argument("--outfile", help="Write output to this file instead of stdout")
-    p.add_argument("--loot-dir", default="./loot")
-    p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--loot-dir", default="./loot", help="Directory for saved hits (loot)")
     return p
 
 
